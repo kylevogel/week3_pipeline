@@ -1,46 +1,36 @@
 # %%
-# College Data Pipeline 
+# College Completion Data Pipeline
 
-
-# Importing all libraries needed for this project
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from io import StringIO 
+from sklearn.preprocessing import MinMaxScaler
 
 # %%
-# Importing dataset and calling shape
+# Load the dataset
 cc_df = pd.read_csv("Data/cc_institution_details.csv")
 cc_df.shape
-#%%
-pd.set_option("display.max_rows", None)
+
+# %%
 cc_df.dtypes
+
 # %%
 def cc_pipeline(df):
-    """
-    This will serve as the pipeline for College Completion dataset.
-    Returns train, tune, and test splits.
-    """
-    # Copy of course, can't lose it
     df = df.copy()
 
-    # 1.) Fix variable types- converting columns when necessary (categorical, numerical)
+    # 1.) Convert columns to categorical type
     categorical_cols = [
         "state",
-        "level",
+        "level", 
         "control",
         "basic",
-        "hbcu",
-        "flagship",
-        "counted_pct"
+        "flagship"
     ]
-    for col in categorical_cols: #converting to categorical type 
+    for col in categorical_cols:
         if col in df.columns:
             df[col] = df[col].astype("category")
 
-    # 2.)Dropping non-predictive columns and stricly identifiers
-    # Reason: These columns wont help the model predict specific outcomes I'm looking for
+    # 2.) Drop identifier columns that won't help prediction
     id_cols = [
         "index",
         "unitid",
@@ -49,88 +39,80 @@ def cc_pipeline(df):
         "nicknames",
         "site",
         "similar",
-        "vsa_grad",
+        "vsa_year",
+        "vsa_grad", 
         "vsa_enroll"
     ]
     df = df.drop(columns=[c for c in id_cols if c in df.columns])
 
-    # 3.) Identifying target col and dropping rows with missing target values
-    # Target column will be grad 150 value
-    target_col = "grad_150_value"
-
-    # Drop rows where target_col is missing
+    # 3.) Set up target variable - predicting HBCU status
+    target_col = "hbcu"
+    
+    # Convert Yes/No to 1/0
+    df[target_col] = df[target_col].map({"Yes": 1, "No": 0})
+    
+    # Drop rows where target is missing
     df = df.dropna(subset=[target_col])
 
-    # assigning predictors x and y
+    # 4.) Separate features (X) and target (Y)
     Y = df[target_col]
     X = df.drop(columns=[target_col])
-    # Now that x and y separated ready for one-hot encoding and scaling
 
-    # 4.) One-hot encoding categorical variables to create binary colomuns
-    # Identify cat colomuns in variable x
-    cat_cols = list(X.select_dtypes(include=["category", "object"]))
-    # Apply one-hot encoding to categorical columns
+    # 5.) One-hot encode categorical columns
+    cat_cols = list(X.select_dtypes(include=["category", "object"]).columns)
     X = pd.get_dummies(X, columns=cat_cols)
 
-    # 5.) Scaling numerical features on a comparable scale
-    # 0-1 range to ensure no numerical domination outside these parameters 
-    num_cols = list(X.select_dtypes(include="number"))
+    # 6.) Scale numerical features to 0-1 range
+    num_cols = list(X.select_dtypes(include="number").columns)
     X[num_cols] = MinMaxScaler().fit_transform(X[num_cols])
 
-    # 6.) Train, Tune, Test split
-    # Frist Split vs remaining data
+    # 7.) Create train/tune/test splits (60/20/20)
     X_train, X_temp, Y_train, Y_temp = train_test_split(
-        X,
-        Y,
-        test_size=0.4,
-        random_state=42
+        X, Y, test_size=0.4, random_state=123
     )
-    # Second split into tune and test
     X_tune, X_test, Y_tune, Y_test = train_test_split(
-        X_temp,
-        Y_temp,
-        test_size=0.5,
-        random_state=42
+        X_temp, Y_temp, test_size=0.5, random_state=123
     )
-    # Returning all datasets
+
+    # 8.) Calculate target prevalence
+    prevalence = Y_train.mean()
+    print(f"HBCU Prevalence in Training Set: {prevalence:.2%}")
+
     return X_train, X_tune, X_test, Y_train, Y_tune, Y_test
 
 # %%
-# Assigning outputs of pipeline to call the pipeline itself
+# Run the pipeline
 X_train, X_tune, X_test, y_train, y_tune, y_test = cc_pipeline(cc_df)
 
 # %%
-# Checking and comparing the x and the y rows of our sets
-print(X_train.shape, y_train.shape)
-print(X_tune.shape, y_tune.shape)
-print(X_test.shape, y_test.shape)
+# Check the shapes
+print(f"Train: {X_train.shape}, {y_train.shape}")
+print(f"Tune: {X_tune.shape}, {y_tune.shape}")
+print(f"Test: {X_test.shape}, {y_test.shape}")
 
 
+# %%
+# Job Placement Data Pipeline
 
-
-#%%
-# Job Placement Dataset 
-
-# Importing all libraries needed for this project
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from io import StringIO 
+from sklearn.preprocessing import MinMaxScaler
+
 # %%
+# Load the dataset
 jp_df = pd.read_csv("Data/job_placement.csv")
 jp_df.shape
 
 # %%
-def jp_pipeline(jp_df): # Utilizing funtions from my first piepline and adjusting for the job placement dataset
-    """
-    Job Placement Dataset Pipeline.
-    Returns train, tune, and test splits.
-    """
-    # Copy of course, can't lose it
-    jp_df = jp_df.copy()
+def jp_pipeline(df):
+    df = df.copy()
+    
+    # 1.) Filter to only placed students (they have salary data)
+    df = df[df["status"] == "Placed"]
+    print(f"Filtered to {len(df)} placed students")
 
-    # 1.) Fix variable types- converting columns when necessary (categorical, numerical)
+    # 2.) Convert columns to categorical type
     categorical_cols = [
         "gender",
         "ssc_b",
@@ -138,61 +120,53 @@ def jp_pipeline(jp_df): # Utilizing funtions from my first piepline and adjustin
         "hsc_s",
         "degree_t",
         "workex",
-        "specialisation",
+        "specialisation"
     ]
-    for col in categorical_cols: #converting to categorical type 
-        if col in jp_df.columns:
-            jp_df[col] = jp_df[col].astype("category")
+    for col in categorical_cols:
+        if col in df.columns:
+            df[col] = df[col].astype("category")
 
-    # 2.)Dropping non-predictive columns and stricly identifiers
-    # Reason: These colums are missing lots of data
-    jp_df = jp_df.drop(columns=["sl_no", "salary"], errors="ignore")
+    # 3.) Drop identifier and unnecessary columns
+    drop_cols = ["sl_no", "status"]  # status is now all "Placed" so not useful
+    df = df.drop(columns=[c for c in drop_cols if c in df.columns])
 
-    # 3.) Identifying target col and dropping rows with missing target values
-    jp_df["status"] = jp_df["status"].map({"Placed": 1, "Not Placed": 0})
+    # 4.) Set up target variable - predicting salary
+    target_col = "salary"
+    
+    # Drop rows where salary is missing
+    df = df.dropna(subset=[target_col])
 
-    # Drop rows where target_col is missing
-    jp_df = jp_df.dropna(subset=["status"])
+    # 5.) Separate features (X) and target (Y)
+    Y = df[target_col]
+    X = df.drop(columns=[target_col])
 
-    # assigning predictors x and y
-    Y = jp_df["status"]
-    X = jp_df.drop(columns=["status"])
-    # Now that x and y separated ready for one-hot encoding and scaling
-
-    # 4.) One-hot encoding categorical variables to create binary colomuns
-    # Identify cat colomuns in variable x
-    cat_cols = list(X.select_dtypes(include=["category", "object"]))
-    # Apply one-hot encoding to categorical columns
+    # 6.) One-hot encode categorical columns
+    cat_cols = list(X.select_dtypes(include=["category", "object"]).columns)
     X = pd.get_dummies(X, columns=cat_cols)
 
-    # 5.) Scaling numerical features on a comparable scale
-    # 0-1 range to ensure no numerical domination outside these parameters 
-    num_cols = list(X.select_dtypes(include="number"))
+    # 7.) Scale numerical features to 0-1 range
+    num_cols = list(X.select_dtypes(include="number").columns)
     X[num_cols] = MinMaxScaler().fit_transform(X[num_cols])
 
-    # 6.) Train, Tune, Test split
-    # Frist Split vs remaining data
+    # 8.) Create train/tune/test splits (60/20/20)
     X_train, X_temp, Y_train, Y_temp = train_test_split(
-        X,
-        Y,
-        test_size=0.4,
-        random_state=42
+        X, Y, test_size=0.4, random_state=123
     )
-    # Second split into tune and test
     X_tune, X_test, Y_tune, Y_test = train_test_split(
-        X_temp,
-        Y_temp,
-        test_size=0.5,
-        random_state=42
+        X_temp, Y_temp, test_size=0.5, random_state=123
     )
-    # Returning all datasets
+
+    # 9.) Show target stats (for regression we show mean instead of prevalence)
+    print(f"Average Salary in Training Set: ${Y_train.mean():,.0f}")
+
     return X_train, X_tune, X_test, Y_train, Y_tune, Y_test
+
 # %%
-# Assigning outputs of pipeline to call the pipeline itself
-# Using the same testing block as last time
+# Run the pipeline
 X_train, X_tune, X_test, y_train, y_tune, y_test = jp_pipeline(jp_df)
 
-print(X_train.shape, y_train.shape)
-print(X_tune.shape, y_tune.shape)
-print(X_test.shape, y_test.shape)
-
+# %%
+# Check the shapes
+print(f"Train: {X_train.shape}, {y_train.shape}")
+print(f"Tune: {X_tune.shape}, {y_tune.shape}")
+print(f"Test: {X_test.shape}, {y_test.shape}")
